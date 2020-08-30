@@ -61,12 +61,10 @@ namespace WinMidi2VJoy
 		static void Main(string[] args)
 		{
 			Console.WriteLine("MIDI-to-VJoy converter by Åke Wallebom");
-			Console.Error.WriteLine("Button Mapping: <midi channel>,<data1 min>-<data1 max>,<joyid>,<buttonoffset> or" + Environment.NewLine + "Axis Mapping: <midi channel>,<data1>,<joyid>,<axis (x,y,z,rx,ry,rz,sl0,sl1)>" + Environment.NewLine + "E.g. 0,23-31,1,-22 0,33-41,1,-22 0,14,1,x 0,15,1,y 0,16,1,z 0,17,1,rx 0,18,1,ry 0,19,1,rz 0,20,1,sl0 0,21,1,sl1" + Environment.NewLine);
+			Console.Error.WriteLine("Button Mapping: <midi channel>,<data1 min>-<data1 max>,<joyid>,<buttonoffset> or" + Environment.NewLine + "Axis Mapping: <midi channel>,<data1>,<joyid>,<axis (x,y,z,rx,ry,rz,sl0,sl1)>" + Environment.NewLine + "E.g. 0,23-31,1,1 0,33-41,1,11 0,14,1,x 0,15,1,y 0,16,1,z 0,17,1,rx 0,18,1,ry 0,19,1,rz 0,20,1,sl0 0,21,1,sl1" + Environment.NewLine);
 
 			stat_mapping = new Mapping();
 
-			// e.g. command-line:
-			// 0,23-31,1,-22 0,33-41,1,-22 0,14,1,x 0,15,1,y 0,16,1,z
 			if (!ParseMappings(args, stat_mapping))
 			{
 				Console.Error.WriteLine("Command-line argument invalid");
@@ -90,6 +88,7 @@ namespace WinMidi2VJoy
 			}
 
 			StartMidi();
+			Console.WriteLine("WinMidi2VJoy Running...");
 		}
 
 		private static void StartMidi()
@@ -137,14 +136,14 @@ namespace WinMidi2VJoy
 					rangeMax = rangeMin;
 				}
 
-				if (int.TryParse(parts[3], out var buttonOffset))
+				if (uint.TryParse(parts[3], out var buttonOffset))
 				{
 					// Add mappings generated from range definition
-					for (int i = rangeMin; i <= rangeMax; i++)
+					uint btn = buttonOffset;
+					for (int data1 = rangeMin; data1 <= rangeMax; data1++, btn++)
 					{
-						var btn = (uint)(i + buttonOffset);
-						Console.WriteLine("Mapping: MIDI Channel " + channel + ", Data1 = " + i + " to vJoy " + joyId + " button " + btn);
-						mapping.AddBtnMapping(channel, i, joyId, btn);
+						Console.WriteLine("Mapping: MIDI Channel " + channel + ", Data1 = " + data1 + " to vJoy " + joyId + " button " + btn);
+						mapping.AddBtnMapping(channel, data1, joyId, btn);
 					}
 				}
 				else
@@ -169,7 +168,7 @@ namespace WinMidi2VJoy
 
 		private static void Input_ChannelMessageReceived(object sender, ChannelMessageEventArgs e)
 		{
-			Console.WriteLine("MIDI Input, Channel: " + e.Message.MidiChannel + " Data1: " + e.Message.Data1 + " Data2: " + e.Message.Data2);
+			Console.WriteLine("Input: MIDI, Channel: " + e.Message.MidiChannel + " Data1: " + e.Message.Data1 + " Data2: " + e.Message.Data2);
 
 			var target = stat_mapping.GetJoyTarget(e.Message.MidiChannel, e.Message.Data1);
 			if (target != null)
@@ -177,13 +176,13 @@ namespace WinMidi2VJoy
 				if (target.Btn != 0)
 				{
 					bool state = e.Message.Data2 != 0;
-					Console.WriteLine("VJoy " + target.JoyId + ", set button " + target.Btn + " = " + state);
+					Console.WriteLine("Output: VJoy " + target.JoyId + ", set button " + target.Btn + " = " + state);
 					stat_vJoy.SetBtn(state, target.JoyId, target.Btn);
 				}
 				else // axis
 				{
 					int hidValue = (int)Math.Round(e.Message.Data2 * MidiToAxisFactor);
-					Console.WriteLine("VJoy " + target.JoyId + ", set axis " + target.Axis + " = " + hidValue);
+					Console.WriteLine("Output: VJoy " + target.JoyId + ", set axis " + target.Axis + " = " + hidValue);
 					stat_vJoy.SetAxis(hidValue, target.JoyId, target.Axis);
 				}
 			}
@@ -203,11 +202,11 @@ namespace WinMidi2VJoy
 			bool match = vJoy.DriverMatch(ref verDll, ref verDrv);
 			if (match)
 			{
-				Console.WriteLine("Driver and DLL are same version ({0:X})", verDll);
+				Console.WriteLine("vJoy driver and DLL are same version ({0:X})", verDll);
 			}
 			else
 			{
-				Console.WriteLine("Driver ({0:X}) and DLL ({1:x}) version mismatch (could work anyway)", verDrv, verDll);
+				Console.WriteLine("vJoy driver ({0:X}) and DLL ({1:x}) version mismatch (could work anyway)", verDrv, verDll);
 			}
 
 			return vJoy;
